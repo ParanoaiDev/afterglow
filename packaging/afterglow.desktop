@@ -1,0 +1,33 @@
+[Desktop Entry]
+Type=Application
+Name=Afterglow
+GenericName=Music desktop
+GenericName[ru]=Музыкальный рабочий стол
+Comment=Music videos, synced lyrics and a glowing clock right on your desktop
+Comment[ru]=Клипы, синхронный текст и светящиеся часы прямо на рабочем столе
+Exec=afterglow
+Icon=afterglow
+Categories=AudioVideo;Audio;Player;
+Keywords=music;player;lyrics;wallpaper;youtube;soundcloud;
+StartupNotify=false
+Actions=Search;PlayPause;Next;Quit;
+
+[Desktop Action Search]
+Name=Search
+Name[ru]=Поиск
+Exec=afterglow --search
+
+[Desktop Action PlayPause]
+Name=Play / pause
+Name[ru]=Пауза / продолжить
+Exec=afterglow --toggle
+
+[Desktop Action Next]
+Name=Next track
+Name[ru]=Следующий трек
+Exec=afterglow --next
+
+[Desktop Action Quit]
+Name=Quit
+Name[ru]=Выйти
+Exec=afterglow --quit
