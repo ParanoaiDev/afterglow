@@ -59,12 +59,47 @@ Item {
                 position = B.position * 1000
         }
     }
-    VideoOutput {
-        id: vo
-        anchors.fill: parent
-        fillMode: VideoOutput.PreserveAspectCrop
+    // Picture area of the clip without baked-in black bars (detected after download).
+    readonly property var geom: (root.mode === "clip" && B.clip.geom && B.clip.geom.w) ? B.clip.geom : null
+    readonly property real vw: geom ? geom.w : 16
+    readonly property real vh: geom ? geom.h : 9
+    readonly property real cx: geom ? geom.cx : 0
+    readonly property real cy: geom ? geom.cy : 0
+    readonly property real cw: geom ? geom.cw : vw
+    readonly property real ch: geom ? geom.ch : vh
+    // tall pictures are shown whole over a blurred copy of themselves; wide ones fill the screen
+    readonly property bool tall: cw / ch < 1.2
+    readonly property real k: tall ? Math.min(width / cw, height / ch) : Math.max(width / cw, height / ch)
+
+    MultiEffect {  // blurred fill behind a tall clip
+        anchors.centerIn: parent
+        width: Math.max(root.width, root.height * root.cw / root.ch) * 1.15
+        height: width * root.ch / root.cw
+        visible: root.tall && root.videoShown
+        source: videoBox
+        autoPaddingEnabled: false
+        blurEnabled: true
+        blur: 1.0
+        blurMax: 64
+        brightness: -0.15
+    }
+    Item {
+        id: videoBox
+        anchors.centerIn: parent
+        width: root.geom ? root.cw * root.k : root.width
+        height: root.geom ? root.ch * root.k : root.height
+        clip: true
         opacity: root.videoShown ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: 1000; easing.type: Easing.InOutQuad } }
+        layer.enabled: root.tall && root.videoShown
+        VideoOutput {
+            id: vo
+            fillMode: root.geom ? VideoOutput.Stretch : VideoOutput.PreserveAspectCrop
+            x: root.geom ? -root.cx * root.k : 0
+            y: root.geom ? -root.cy * root.k : 0
+            width: root.geom ? root.vw * root.k : parent.width
+            height: root.geom ? root.vh * root.k : parent.height
+        }
     }
     Connections {
         target: B

@@ -240,12 +240,28 @@ Item {
             }
             Segments {
                 label: root.st.signIn
-                key: "cookiesBrowser"
+                key: "signIn"
                 options: [
-                    { value: "", text: root.st.none }, { value: "chrome", text: "Chrome" }, { value: "chromium", text: "Chromium" },
-                    { value: "brave", text: "Brave" }, { value: "firefox", text: "Firefox" }, { value: "vivaldi", text: "Vivaldi" }
+                    { value: "auto", text: root.st.auto }, { value: "firefox", text: "Firefox" }, { value: "chrome", text: "Chrome" },
+                    { value: "chromium", text: "Chromium" }, { value: "brave", text: "Brave" }, { value: "off", text: root.st.off }
                 ]
             }
+            Row {
+                spacing: 10 * root.u
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 10 * root.u; height: width; radius: width / 2
+                    color: B.account ? "#4ade80" : "#f87171"
+                }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: B.account ? root.st.signedInAs.replace("{0}", B.account.charAt(0).toUpperCase() + B.account.slice(1)) : root.st.notSignedIn
+                    color: "white"
+                    font.pixelSize: 15 * root.u
+                }
+                Pill { text: root.st.checkAgain; onClicked: B.checkSignIn() }
+            }
+            Toggle { label: root.st.autoplay; key: "autoplay" }
             Text {
                 width: parent.width
                 text: root.st.signInHint
@@ -261,7 +277,11 @@ Item {
             }
             Toggle { label: root.st.autostart; key: "autostart" }
             Item { width: 1; height: 10 * root.u }
-            Pill { text: root.st.reset; onClicked: S.reset() }
+            Row {
+                spacing: 10 * root.u
+                Pill { text: root.st.reset; onClicked: S.reset() }
+                Pill { text: root.st.quit; onClicked: B.quit() }
+            }
             Item { width: 1; height: 10 * root.u }
         }
     }

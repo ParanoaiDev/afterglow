@@ -132,6 +132,7 @@ Item {
             enabledLook: S.data.showLyrics
             onClicked: S.set("showLyrics", !S.data.showLyrics)
         }
+        IconButton { icon: "mix"; size: 19 * root.u; anchors.verticalCenter: parent.verticalCenter; onClicked: B.startMyMix() }
         IconButton { icon: "search"; size: 19 * root.u; anchors.verticalCenter: parent.verticalCenter; onClicked: root.searchClicked() }
         IconButton { icon: "settings"; size: 19 * root.u; anchors.verticalCenter: parent.verticalCenter; onClicked: root.settingsClicked() }
         IconButton {
@@ -160,5 +161,7 @@ Item {
                 onWheel: (w) => B.setVolume(S.data.volume + (w.angleDelta.y > 0 ? 5 : -5))
             }
         }
+        Rectangle { width: 1; height: 30 * root.u; anchors.verticalCenter: parent.verticalCenter; color: Qt.rgba(1, 1, 1, 0.15) }
+        IconButton { icon: "power"; size: 18 * root.u; anchors.verticalCenter: parent.verticalCenter; color: "#ff6b6b"; onClicked: B.quit() }
     }
 }

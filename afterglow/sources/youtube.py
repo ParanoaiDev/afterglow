@@ -1,4 +1,5 @@
 """YouTube search and mixes through the public InnerTube endpoints used by youtube.com."""
+from .. import auth
 from .common import norm, parse_duration, session, split_title
 
 API = "https://www.youtube.com/youtubei/v1/"
@@ -6,7 +7,8 @@ CONTEXT = {"client": {"clientName": "WEB", "clientVersion": "2.20261117.00.00", 
 
 
 def _post(endpoint, payload):
-    r = session.post(API + endpoint + "?prettyPrint=false", json={"context": CONTEXT, **payload}, timeout=15)
+    r = session.post(API + endpoint + "?prettyPrint=false", json={"context": CONTEXT, **payload},
+                     headers=auth.headers(), timeout=20)
     r.raise_for_status()
     return r.json()
 
@@ -26,12 +28,12 @@ def thumb(video_id):
 def track_from_video(video_id, title, channel, duration):
     artist, name = split_title(title, channel)
     low = title.lower()
-    if channel.endswith(" - Topic") or "audio" in low:
+    # "video": the upload is a real clip, so it can be the background in sync with the sound
+    static = ("audio", "lyric", "текст", "visualizer", "visualiser", "slowed", "sped up", "speed up", "8d", "nightcore")
+    if channel.endswith(" - Topic") or any(w in low for w in static):
         kind = "song"
-    elif "video" in low or channel.upper().endswith("VEVO"):
-        kind = "video"
     else:
-        kind = "song"
+        kind = "video"
     return {
         "id": "yt:" + video_id,
         "videoId": video_id,
@@ -88,7 +90,18 @@ def search(query, limit=24):
 
 def mix(video_id, limit=25):
     """YouTube's auto-generated radio for a video: the 'Up next' list."""
-    data = _post("next", {"videoId": video_id, "playlistId": "RD" + video_id})
+    return _panel(_post("next", {"videoId": video_id, "playlistId": "RD" + video_id}), limit)
+
+
+def my_mix(after_video_id=None, limit=50):
+    """The signed-in user's personal 'My Mix' (RDMM). Pass the last video id to get the continuation."""
+    payload = {"playlistId": "RDMM"}
+    if after_video_id:
+        payload["videoId"] = after_video_id
+    return _panel(_post("next", payload), limit)
+
+
+def _panel(data, limit):
     panel = (data.get("contents", {}).get("twoColumnWatchNextResults", {})
              .get("playlist", {}).get("playlist", {}).get("contents", []))
     out = []

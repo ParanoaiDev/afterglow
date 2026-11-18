@@ -27,8 +27,10 @@ DEFAULTS = {
     "clock24": True,
     # source: auto | youtube | soundcloud
     "source": "auto",
-    # browser to borrow YouTube sign-in from: "" | chrome | chromium | brave | firefox | vivaldi | opera
-    "cookiesBrowser": "",
+    # where to borrow the YouTube sign-in from: auto | off | firefox | chrome | chromium | brave | vivaldi | opera
+    "signIn": "auto",
+    # start the personal "My Mix" when Afterglow starts
+    "autoplay": True,
     "clipQuality": 1080,
     "clipCacheMB": 1500,
     "volume": 70,

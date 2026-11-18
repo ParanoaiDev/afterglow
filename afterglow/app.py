@@ -61,6 +61,7 @@ def main():
         f = QFont("Inter")
         f.setPointSizeF(app.font().pointSizeF())
         app.setFont(f)
+    QFontDatabase.addApplicationFont(str(HERE / "assets" / "fonts" / "Oswald.ttf"))
     icon = QIcon(str(HERE / "assets" / "afterglow.svg"))
     app.setWindowIcon(icon)
 

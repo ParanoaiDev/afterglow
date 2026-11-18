@@ -8,6 +8,7 @@ Afterglow is a full-screen surface on the **desktop layer** (`wlr-layer-shell`, 
 
 ## Features
 
+- **Starts playing by itself**: Afterglow picks up the YouTube sign-in from your browser (Firefox, Chrome, Chromium, Brave…) and plays your personal *My Mix*, music videos included. The mix keeps going on its own.
 - **Search everywhere**: YouTube and SoundCloud in one search box. Pick the source in the player bar, or leave it on *Automatic*.
 - **Music video background**: Afterglow finds the official music video, caches a video-only copy and plays it behind everything. When the track itself is the music video, picture and sound stay in sync.
 - **Synced lyrics** from [LRCLIB](https://lrclib.net), with big kinetic lines. *Other lyrics* switches to another version when the first match is wrong.
@@ -54,11 +55,11 @@ Or run it from the source folder without installing: `python -m afterglow`.
 
 The desktop layer only gets keyboard focus when you click it. To open the search from anywhere, bind `afterglow --search` to a key in *System Settings → Shortcuts*. Other commands: `--toggle`, `--next`, `--prev`, `--play "artist song"`, `--quit`, `--windowed`.
 
-There is no taskbar entry. Use the tray icon to open settings, hide the player or quit.
+There is no taskbar entry. Quit with the red power button in the player bar, from the tray icon, or with `afterglow --quit`.
 
-### "YouTube wants a sign-in"
+### YouTube sign-in
 
-YouTube sometimes refuses anonymous playback with *Sign in to confirm you're not a bot*, depending on your network. If that happens, open **Settings → YouTube sign-in from browser** and pick a browser where you are logged in to YouTube. yt-dlp then reads that browser's YouTube cookies locally. They are only sent to YouTube.
+Sign in at youtube.com in your browser once. Afterglow finds the sign-in on its own (**Settings → YouTube sign-in**, *Auto* by default) and uses it for *My Mix* and for playback. That also gets around *Sign in to confirm you're not a bot*, which YouTube shows on many VPNs. The cookies are read locally through yt-dlp and only ever sent to YouTube. Afterglow doesn't store them.
 
 SoundCloud never needs a sign-in. Major-label tracks there are DRM-locked, though, and in that case Afterglow plays the same song from YouTube instead.
 
@@ -77,7 +78,7 @@ Settings live in `~/.config/afterglow/settings.json`.
 
 ## License
 
-MIT. Afterglow streams from third-party services. Their content belongs to the respective rights holders, and you are responsible for following their terms.
+MIT. The bundled Oswald font is under the SIL Open Font License (`afterglow/assets/fonts/OFL.txt`). Afterglow streams from third-party services. Their content belongs to the respective rights holders, and you are responsible for following their terms.
 
 ---
 
@@ -87,6 +88,7 @@ MIT. Afterglow streams from third-party services. Their content belongs to the r
 
 Приложение живёт на слое рабочего стола, под всеми окнами. Сверни окна (Meta+D в KDE), и рабочий стол станет плеером.
 
+- Сам включает твой «Мой микс» с YouTube вместе с клипами. Достаточно один раз войти в YouTube в браузере (Firefox, Chrome и др.).
 - Поиск сразу по YouTube и SoundCloud. Источник выбирается кнопкой слева в плеере.
 - Клип на фоне: приложение само находит официальный клип и кэширует его.
 - Синхронный текст из LRCLIB. Кнопка «Другой текст» переключает на другую версию.
@@ -97,6 +99,6 @@ MIT. Afterglow streams from third-party services. Their content belongs to the r
 
 Установка: `./install.sh`, потом `afterglow`. Нужны пакеты из списка выше.
 
-Если YouTube пишет «Sign in to confirm you're not a bot», открой **Настройки → Вход YouTube из браузера** и выбери браузер, в котором ты вошёл в YouTube.
+Закрыть приложение можно красной кнопкой справа в плеере, через иконку в трее или командой `afterglow --quit`.
 
 Глобальная горячая клавиша для поиска: *Параметры системы → Комбинации клавиш*, команда `afterglow --search`.

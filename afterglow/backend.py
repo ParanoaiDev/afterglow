@@ -8,7 +8,10 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, Property, QTimer, QUrl, Signal, Slot
 
-from . import clips, colors, i18n, lyrics, meta, tasks
+from PySide6.QtCore import QCoreApplication
+from PySide6.QtGui import QDesktopServices
+
+from . import auth, clips, colors, i18n, lyrics, meta, tasks
 from .player import MpvPlayer
 from .sources import soundcloud, youtube
 
@@ -28,6 +31,7 @@ class Backend(QObject):
     toastRequested = Signal(str)
     openSearchRequested = Signal()
     visibilityToggleRequested = Signal()
+    accountChanged = Signal()
 
     def __init__(self, settings):
         super().__init__()
@@ -53,6 +57,10 @@ class Backend(QObject):
         self._gen = 0
         self._search_gen = 0
         self._fallback_tried = set()
+        self._account = ""          # browser we borrow the YouTube sign-in from
+        self._account_checked = False
+        self._queue_kind = ""       # "mymix" when the queue is the personal mix
+        self._extending = False
 
         self.player = MpvPlayer()
         self.player.positionChanged.connect(self._on_position)
@@ -68,8 +76,68 @@ class Backend(QObject):
         if not self.player.available:
             QTimer.singleShot(1500, lambda: self.toastRequested.emit(self._strings["errMpv"]))
             return
-        self.player.start(self.settings.get("cookiesBrowser"), self.settings.get("volume"))
+        self.player.start("", self.settings.get("volume"))
         QTimer.singleShot(3000, lambda: tasks.run(clips.trim_cache, self.settings.get("clipCacheMB")))
+        self.checkSignIn()
+
+    # ---------------------------------------------------------------- account
+    def _cookies_browser(self):
+        return self._account
+
+    @Slot()
+    def checkSignIn(self):
+        pref = self.settings.get("signIn")
+        pref = "" if pref == "off" else pref
+
+        def done(browser):
+            changed = browser != self._account
+            self._account = browser
+            self._account_checked = True
+            self.accountChanged.emit()
+            if changed:
+                self.player.start(browser, self.settings.get("volume"))
+                if self._track:
+                    self._play_current()
+            if browser and not self._track and self.settings.get("autoplay"):
+                self.startMyMix()
+
+        tasks.run(auth.load, pref, on_done=done, on_error=lambda e: done(""))
+
+    account = Property(str, lambda self: self._account, notify=accountChanged)
+    accountChecked = Property(bool, lambda self: self._account_checked, notify=accountChanged)
+
+    @Slot()
+    def openYouTube(self):
+        QDesktopServices.openUrl(QUrl("https://www.youtube.com/"))
+
+    @Slot()
+    def quit(self):
+        QCoreApplication.quit()
+
+    @Slot()
+    def startMyMix(self):
+        if not self._account:
+            self.toastRequested.emit(self._strings["needSignIn"])
+            return
+        self._loading = True
+        self.stateChanged.emit()
+
+        def ok(items):
+            self._loading = False
+            self.stateChanged.emit()
+            if not items:
+                self.toastRequested.emit(self._strings["mixEmpty"])
+                return
+            self._queue_kind = "mymix"
+            self._set_queue(items, 0)
+            self._play_current()
+
+        def err(exc):
+            self._loading = False
+            self.stateChanged.emit()
+            self.toastRequested.emit(self._strings["mixEmpty"] + ": " + str(exc)[:100])
+
+        tasks.run(youtube.my_mix, on_done=ok, on_error=err)
 
     def shutdown(self):
         self.player.stop_process()
@@ -111,6 +179,11 @@ class Backend(QObject):
         return SOURCE_NAMES.get(self.settings.get("source"), "YouTube")
 
     sourceLabel = Property(str, _get_source_label, notify=trackChanged)
+
+    def _get_queue_title(self):
+        return self._strings["myMix"] if self._queue_kind == "mymix" else self._strings["continuePlaying"]
+
+    queueTitle = Property(str, _get_queue_title, notify=queueChanged)
 
     # ---------------------------------------------------------------- search
     @Slot(str)
@@ -182,6 +255,7 @@ class Backend(QObject):
     def playResult(self, track):
         tracks = self._search.get("tracks") or []
         rest = [t for t in tracks if t.get("id") != track.get("id") and t.get("source") == track.get("source")]
+        self._queue_kind = ""
         if track.get("source") == "soundcloud":
             self._set_queue([track] + rest[:20], 0)
         else:
@@ -201,19 +275,33 @@ class Backend(QObject):
         self._qindex = index
         self.queueChanged.emit()
 
-    def _extend_with_mix(self, track):
-        if track.get("source") != "youtube":
+    def _extend_with_mix(self, track, then_next=False):
+        if track.get("source") != "youtube" or self._extending:
             return
-        gen = self._gen
+        self._extending = True
 
         def ok(items):
+            self._extending = False
             known = {t["id"] for t in self._queue}
             add = [t for t in items if t["id"] not in known]
             if add:
                 self._queue = self._queue + add
                 self.queueChanged.emit()
+            if then_next:
+                self.next()
 
-        tasks.run(youtube.mix, track["videoId"], on_done=ok)
+        def err(exc):
+            self._extending = False
+
+        if self._queue_kind == "mymix":
+            tasks.run(youtube.my_mix, track["videoId"], on_done=ok, on_error=err)
+        else:
+            tasks.run(youtube.mix, track["videoId"], on_done=ok, on_error=err)
+
+    def _maybe_extend(self):
+        # keep a few tracks ahead so the music never stops
+        if self._queue and self._qindex >= len(self._queue) - 3:
+            self._extend_with_mix(self._queue[-1])
 
     def _play_current(self):
         if not (0 <= self._qindex < len(self._queue)):
@@ -234,6 +322,7 @@ class Backend(QObject):
         self.lookChanged.emit()
         self.player.load(track["url"])
         self._update_mpris()
+        self._maybe_extend()
 
         if self._cover:
             tasks.run(colors.accent_from_url, self._cover, on_done=lambda c: self._set_accent(gen, c))
@@ -274,8 +363,19 @@ class Backend(QObject):
             if gen != self._gen:
                 return
             path, synced = res
-            self._clip = {"path": QUrl.fromLocalFile(path).toString() if path else "", "synced": synced, "loading": False}
-            self.lookChanged.emit()
+            if not path:
+                self._clip = {"path": "", "synced": False, "loading": False}
+                self.lookChanged.emit()
+                return
+
+            def show(geom):
+                if gen != self._gen:
+                    return
+                self._clip = {"path": QUrl.fromLocalFile(path).toString(), "synced": synced, "loading": False,
+                              "geom": geom or {}}
+                self.lookChanged.emit()
+
+            tasks.run(clips.geometry, path, on_done=show, on_error=lambda e: show({}))
 
         def err(exc):
             if gen != self._gen:
@@ -285,7 +385,7 @@ class Backend(QObject):
             if isinstance(exc, clips.SignInRequired):
                 self.toastRequested.emit(self._strings["errBot"])
 
-        tasks.run(clips.resolve, track, self.settings.get("clipQuality"), self.settings.get("cookiesBrowser"),
+        tasks.run(clips.resolve, track, self.settings.get("clipQuality"), self._account,
                   on_done=ok, on_error=err)
 
     @Slot()
@@ -375,8 +475,7 @@ class Backend(QObject):
             self.player.load(self._track["url"])
             return
         if self._qindex + 1 >= len(self._queue) and self._track and self._track.get("source") == "youtube":
-            self._extend_with_mix(self._track)
-            QTimer.singleShot(2500, self.next)
+            self._extend_with_mix(self._queue[-1], then_next=True)
             return
         self.next()
 
@@ -454,11 +553,8 @@ class Backend(QObject):
 
     # ---------------------------------------------------------------- settings
     def _on_setting(self, key):
-        if key == "cookiesBrowser":
-            pos, track, paused = self._position, self._track, self._paused
-            self.player.start(self.settings.get("cookiesBrowser"), self.settings.get("volume"))
-            if track:
-                self._play_current()
+        if key == "signIn":
+            self.checkSignIn()
         elif key == "background":
             if self.settings.get("background") == "clip" and not self._clip.get("path"):
                 self._load_clip()

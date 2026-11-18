@@ -33,8 +33,7 @@ Item {
         u: scene.u
         color: scene.accent
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.horizontalCenterOffset: 120 * scene.u
-        y: parent.height * 0.07
+        y: parent.height * 0.045
     }
 
     QueueList {
@@ -46,14 +45,56 @@ Item {
         height: parent.height * 0.56
     }
 
+    readonly property bool showWelcome: B.accountChecked && !B.account && !B.track
+
     NowCard {
         id: card
-        visible: scene.cfg.showCard
+        visible: scene.cfg.showCard && !scene.showWelcome
         u: scene.u
         accent: scene.accent
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.horizontalCenterOffset: -60 * scene.u
         y: parent.height * 0.42
+    }
+
+    // first run without a YouTube sign-in: explain what to do
+    Item {
+        id: welcome
+        visible: scene.showWelcome
+        width: 620 * scene.u
+        height: wcol.height + 56 * scene.u
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: parent.height * 0.44
+        Glass { anchors.fill: parent; radius: 30 * scene.u; backdrop: bg; tint: 0.6 }
+        Column {
+            id: wcol
+            x: 32 * scene.u; y: 28 * scene.u
+            width: parent.width - 64 * scene.u
+            spacing: 14 * scene.u
+            Text { text: B.strings.welcomeTitle; color: "white"; font.pixelSize: 28 * scene.u; font.weight: Font.Bold }
+            Text {
+                width: parent.width
+                text: B.strings.welcomeText
+                color: Qt.rgba(1, 1, 1, 0.75)
+                font.pixelSize: 17 * scene.u
+                wrapMode: Text.WordWrap
+                lineHeight: 1.15
+            }
+            Row {
+                spacing: 10 * scene.u
+                Rectangle {
+                    width: wb1.implicitWidth + 32 * scene.u; height: 42 * scene.u; radius: height / 2
+                    color: scene.accent
+                    Text { id: wb1; anchors.centerIn: parent; text: B.strings.openYouTube; color: "#111"; font.pixelSize: 15 * scene.u; font.weight: Font.Bold }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: B.openYouTube() }
+                }
+                Rectangle {
+                    width: wb2.implicitWidth + 32 * scene.u; height: 42 * scene.u; radius: height / 2
+                    color: Qt.rgba(1, 1, 1, 0.12)
+                    Text { id: wb2; anchors.centerIn: parent; text: B.strings.checkAgain; color: "white"; font.pixelSize: 15 * scene.u; font.weight: Font.DemiBold }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: B.checkSignIn() }
+                }
+            }
+        }
     }
     Rectangle {  // "Other lyrics" chip under the card
         visible: scene.cfg.showCard && scene.cfg.showLyrics && B.lyrics.versions > 1
@@ -77,7 +118,7 @@ Item {
         accent: scene.accent
         x: scene.cfg.showCard ? card.x + card.width + 60 * scene.u : parent.width * 0.3
         y: card.y + 20 * scene.u
-        width: Math.min(parent.width - x - 120 * scene.u, 760 * scene.u)
+        width: Math.min(parent.width - x - 140 * scene.u, 720 * scene.u)
         height: card.height - 40 * scene.u
     }
 
@@ -87,7 +128,7 @@ Item {
         accent: scene.accent
         backdrop: bg
         anchors.horizontalCenter: parent.horizontalCenter
-        y: parent.height - height - 46 * scene.u
+        y: parent.height - height - 130 * scene.u   // stay clear of a bottom panel / dock
         onServiceClicked: { scene.searchOpen = false; scene.settingsOpen = false; scene.serviceOpen = !scene.serviceOpen }
         onSearchClicked: scene.searchOpen ? scene.closePopups() : scene.openSearch()
         onSettingsClicked: { scene.searchOpen = false; scene.serviceOpen = false; scene.settingsOpen = !scene.settingsOpen }

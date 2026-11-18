@@ -12,7 +12,7 @@ Item {
         id: header
         spacing: 6 * root.u
         Text {
-            text: B.strings.continuePlaying
+            text: B.queueTitle
             color: "white"
             font.pixelSize: 19 * root.u
             font.weight: Font.Bold
