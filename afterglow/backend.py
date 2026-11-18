@@ -1,6 +1,7 @@
 """The object QML talks to: playback state, queue, search, lyrics, colors and the background clip."""
 import bisect
 import os
+import random
 import shutil
 import subprocess
 import sys
@@ -11,7 +12,7 @@ from PySide6.QtCore import QObject, Property, QTimer, QUrl, Signal, Slot
 from PySide6.QtCore import QCoreApplication
 from PySide6.QtGui import QDesktopServices
 
-from . import auth, clips, colors, i18n, lyrics, meta, tasks
+from . import auth, clips, colors, i18n, lyrics, meta, recommend, tasks
 from .player import MpvPlayer
 from .sources import soundcloud, youtube
 
@@ -32,6 +33,8 @@ class Backend(QObject):
     openSearchRequested = Signal()
     visibilityToggleRequested = Signal()
     accountChanged = Signal()
+    tasteChanged = Signal()
+    tasteRequested = Signal()
 
     def __init__(self, settings):
         super().__init__()
@@ -59,8 +62,13 @@ class Backend(QObject):
         self._fallback_tried = set()
         self._account = ""          # browser we borrow the YouTube sign-in from
         self._account_checked = False
+        self._autostarted = False
         self._queue_kind = ""       # "mymix" when the queue is the personal mix
         self._extending = False
+        self.taste = recommend.Taste()
+        self._suggestions = []
+        self._suggest_gen = 0
+        self._prev_switch_by_user = False
 
         self.player = MpvPlayer()
         self.player.positionChanged.connect(self._on_position)
@@ -98,8 +106,12 @@ class Backend(QObject):
                 self.player.start(browser, self.settings.get("volume"))
                 if self._track:
                     self._play_current()
-            if browser and not self._track and self.settings.get("autoplay"):
-                self.startMyMix()
+            if not self._track and self.settings.get("autoplay") and not self._autostarted:
+                self._autostarted = True
+                if self.taste.seeds:
+                    self.startForYou()
+                else:
+                    self.tasteRequested.emit()
 
         tasks.run(auth.load, pref, on_done=done, on_error=lambda e: done(""))
 
@@ -113,6 +125,97 @@ class Backend(QObject):
     @Slot()
     def quit(self):
         QCoreApplication.quit()
+
+    # ---------------------------------------------------------------- "For you": our own picker
+    tasteSeeds = Property("QVariant", lambda self: self.taste.seeds, notify=tasteChanged)
+    artistSuggestions = Property("QVariant", lambda self: self._suggestions, notify=tasteChanged)
+
+    def _get_liked(self):
+        t = self._track or {}
+        return self.taste.is_liked(t.get("videoId") or t.get("id"))
+
+    liked = Property(bool, _get_liked, notify=tasteChanged)
+
+    @Slot("QVariant")
+    def setSeeds(self, names):
+        self.taste.set_seeds(list(names or []))
+        self.tasteChanged.emit()
+
+    @Slot(str)
+    def suggestArtists(self, query):
+        self._suggest_gen += 1
+        gen = self._suggest_gen
+        query = (query or "").strip()
+        if len(query) < 2:
+            self._suggestions = []
+            self.tasteChanged.emit()
+            return
+
+        def ok(items):
+            if gen == self._suggest_gen:
+                self._suggestions = items
+                self.tasteChanged.emit()
+
+        tasks.run(recommend.artist_suggestions, query, on_done=ok, on_error=lambda e: ok([]))
+
+    @Slot()
+    def startForYou(self):
+        if not self.taste.seeds and not self.taste.liked_tracks():
+            self.tasteRequested.emit()
+            return
+        self._loading = True
+        self.stateChanged.emit()
+
+        def ok(items):
+            self._loading = False
+            self.stateChanged.emit()
+            if not items:
+                self.toastRequested.emit(self._strings["mixEmpty"])
+                return
+            self._queue_kind = "foryou"
+            self._set_queue(items, 0)
+            self._play_current()
+
+        def err(exc):
+            self._loading = False
+            self.stateChanged.emit()
+            self.toastRequested.emit(self._strings["mixEmpty"] + ": " + str(exc)[:100])
+
+        tasks.run(recommend.build, self.taste, self.settings.get("noRussian"), on_done=ok, on_error=err)
+
+    @Slot()
+    def toggleLike(self):
+        if not self._track:
+            return
+        self.taste.track_event(self._track, "unliked" if self._get_liked() else "liked")
+        self.tasteChanged.emit()
+
+    @Slot()
+    def banCurrent(self):
+        """'Don't suggest': never play this artist again and move on."""
+        t = self._track
+        if not t:
+            return
+        artist = t.get("artist", "")
+        self.taste.track_event(t, "banned")
+        keep = [q for i, q in enumerate(self._queue)
+                if i <= self._qindex or not self.taste.is_banned(q.get("artist", ""))]
+        self._queue = keep
+        self.queueChanged.emit()
+        self.tasteChanged.emit()
+        self.toastRequested.emit(self._strings["banned"].format(artist))
+        self._prev_switch_by_user = False
+        self.next()
+
+    def _learn_from_switch(self, finished):
+        """Called when the current track is replaced: finished, or skipped early by the listener."""
+        t = self._track
+        if not t or t.get("source") != "youtube":
+            return
+        if finished:
+            self.taste.track_event(t, "finished")
+        elif self._prev_switch_by_user and self._position < min(30.0, 0.4 * (self._duration or 100)):
+            self.taste.track_event(t, "skipped")
 
     @Slot()
     def startMyMix(self):
@@ -181,7 +284,7 @@ class Backend(QObject):
     sourceLabel = Property(str, _get_source_label, notify=trackChanged)
 
     def _get_queue_title(self):
-        return self._strings["myMix"] if self._queue_kind == "mymix" else self._strings["continuePlaying"]
+        return {"mymix": self._strings["myMix"], "foryou": self._strings["forYou"]}.get(self._queue_kind, self._strings["continuePlaying"])
 
     queueTitle = Property(str, _get_queue_title, notify=queueChanged)
 
@@ -266,6 +369,7 @@ class Backend(QObject):
     @Slot(int)
     def playQueue(self, index):
         if 0 <= index < len(self._queue):
+            self._learn_from_switch(False) if self._prev_switch_by_user else None
             self._qindex = index
             self.queueChanged.emit()
             self._play_current()
@@ -295,6 +399,11 @@ class Backend(QObject):
 
         if self._queue_kind == "mymix":
             tasks.run(youtube.my_mix, track["videoId"], on_done=ok, on_error=err)
+        elif self._queue_kind == "foryou":
+            recent = [q for q in self._queue[-6:] if q.get("source") == "youtube"]
+            loved = [q for q in recent if self.taste.score(q.get("artist", "")) > 0] or recent
+            tasks.run(recommend.build, self.taste, self.settings.get("noRussian"), [q.get("videoId") for q in self._queue],
+                      30, random.sample(loved, min(2, len(loved))) if loved else None, on_done=ok, on_error=err)
         else:
             tasks.run(youtube.mix, track["videoId"], on_done=ok, on_error=err)
 
@@ -307,6 +416,9 @@ class Backend(QObject):
         if not (0 <= self._qindex < len(self._queue)):
             return
         track = dict(self._queue[self._qindex])
+        if track.get("source") == "youtube":
+            self.taste.track_event(track, "played")
+        self._prev_switch_by_user = True   # until the track ends by itself
         self._gen += 1
         gen = self._gen
         self._track = track
@@ -317,6 +429,7 @@ class Backend(QObject):
         self._clip = {"path": "", "synced": False, "loading": False}
         self._set_lyrics_loading()
         self.trackChanged.emit()
+        self.tasteChanged.emit()
         self.positionChanged.emit()
         self.stateChanged.emit()
         self.lookChanged.emit()
@@ -405,6 +518,7 @@ class Backend(QObject):
 
     @Slot()
     def next(self):
+        self._learn_from_switch(False)
         if self._qindex + 1 < len(self._queue):
             self._qindex += 1
         elif self.settings.get("repeat") == "all" and self._queue:
@@ -470,6 +584,8 @@ class Backend(QObject):
         self._update_mpris()
 
     def _on_ended(self):
+        self._learn_from_switch(True)
+        self._prev_switch_by_user = False
         if self.settings.get("repeat") == "one":
             self.seek(0)
             self.player.load(self._track["url"])

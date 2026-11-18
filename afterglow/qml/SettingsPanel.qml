@@ -233,6 +233,14 @@ Item {
             Toggle { label: root.st.glow; key: "showGlow" }
             Slide { label: root.st.glowStrength; key: "glowStrength"; from: 0.1; to: 1; visible: root.cfg.showGlow }
 
+            Section { text: root.st.forYou }
+            Row {
+                spacing: 10 * root.u
+                Pill { text: root.st.tasteEdit; onClicked: { root.closeRequested(); B.tasteRequested() } }
+                Pill { text: root.st.myMix + " (YouTube)"; onClicked: { root.closeRequested(); B.startMyMix() } }
+            }
+            Toggle { label: root.st.noRussian; key: "noRussian" }
+
             Section { text: root.st.source }
             Segments {
                 key: "source"
@@ -261,7 +269,7 @@ Item {
                 }
                 Pill { text: root.st.checkAgain; onClicked: B.checkSignIn() }
             }
-            Toggle { label: root.st.autoplay; key: "autoplay" }
+            Toggle { label: root.st.autoplayForYou; key: "autoplay" }
             Text {
                 width: parent.width
                 text: root.st.signInHint

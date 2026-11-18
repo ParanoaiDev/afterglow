@@ -8,7 +8,8 @@ Afterglow is a full-screen surface on the **desktop layer** (`wlr-layer-shell`, 
 
 ## Features
 
-- **Starts playing by itself**: Afterglow picks up the YouTube sign-in from your browser (Firefox, Chrome, Chromium, Brave…) and plays your personal *My Mix*, music videos included. The mix keeps going on its own.
+- **For You, picked by Afterglow itself**: on first start you name a few artists you actually listen to. Afterglow builds radio from them and learns as you go: tracks you finish push an artist up, early skips push it down, ♥ is a strong yes, and *Don't suggest* bans an artist. Russian-language tracks can be filtered out (on by default). YouTube's own *My Mix* is still in Settings, but it only knows your watch history, which is often games and vlogs rather than music.
+- **Starts playing by itself**: Afterglow picks up the YouTube sign-in from your browser (Firefox, Chrome, Chromium, Brave…).
 - **Search everywhere**: YouTube and SoundCloud in one search box. Pick the source in the player bar, or leave it on *Automatic*.
 - **Music video background**: Afterglow finds the official music video, caches a video-only copy and plays it behind everything. When the track itself is the music video, picture and sound stay in sync.
 - **Synced lyrics** from [LRCLIB](https://lrclib.net), with big kinetic lines. *Other lyrics* switches to another version when the first match is wrong.
@@ -88,7 +89,8 @@ MIT. The bundled Oswald font is under the SIL Open Font License (`afterglow/asse
 
 Приложение живёт на слое рабочего стола, под всеми окнами. Сверни окна (Meta+D в KDE), и рабочий стол станет плеером.
 
-- Сам включает твой «Мой микс» с YouTube вместе с клипами. Достаточно один раз войти в YouTube в браузере (Firefox, Chrome и др.).
+- Подборка «Для тебя»: при первом запуске выбираешь исполнителей, которых слушаешь, дальше Afterglow учится сам. Дослушал — плюс исполнителю, быстро пропустил — минус, ♥ — сильный плюс, «Не предлагать» — исполнитель больше не попадётся. Русские треки по умолчанию не попадают в подборку.
+- Вход в YouTube Afterglow сам берёт из браузера (Firefox, Chrome и др.).
 - Поиск сразу по YouTube и SoundCloud. Источник выбирается кнопкой слева в плеере.
 - Клип на фоне: приложение само находит официальный клип и кэширует его.
 - Синхронный текст из LRCLIB. Кнопка «Другой текст» переключает на другую версию.

@@ -132,7 +132,7 @@ Item {
             enabledLook: S.data.showLyrics
             onClicked: S.set("showLyrics", !S.data.showLyrics)
         }
-        IconButton { icon: "mix"; size: 19 * root.u; anchors.verticalCenter: parent.verticalCenter; onClicked: B.startMyMix() }
+        IconButton { icon: "mix"; size: 19 * root.u; anchors.verticalCenter: parent.verticalCenter; onClicked: B.startForYou() }
         IconButton { icon: "search"; size: 19 * root.u; anchors.verticalCenter: parent.verticalCenter; onClicked: root.searchClicked() }
         IconButton { icon: "settings"; size: 19 * root.u; anchors.verticalCenter: parent.verticalCenter; onClicked: root.settingsClicked() }
         IconButton {

@@ -31,6 +31,8 @@ DEFAULTS = {
     "signIn": "auto",
     # start the personal "My Mix" when Afterglow starts
     "autoplay": True,
+    # leave out tracks with Cyrillic titles or artists in recommendations
+    "noRussian": True,
     "clipQuality": 1080,
     "clipCacheMB": 1500,
     "volume": 70,

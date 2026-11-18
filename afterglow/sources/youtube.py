@@ -50,6 +50,66 @@ def track_from_video(video_id, title, channel, duration):
     }
 
 
+def _lockup(lv):
+    """Newer 'lockupViewModel' video cards (history, liked list, some search shelves)."""
+    if lv.get("contentType") not in (None, "LOCKUP_CONTENT_TYPE_VIDEO"):
+        return None
+    vid = lv.get("contentId")
+    meta = lv.get("metadata", {}).get("lockupMetadataViewModel", {})
+    title = meta.get("title", {}).get("content", "")
+    channel = ""
+    rows = meta.get("metadata", {}).get("contentMetadataViewModel", {}).get("metadataRows", [])
+    if rows and rows[0].get("metadataParts"):
+        channel = rows[0]["metadataParts"][0].get("text", {}).get("content", "")
+    dur = 0
+    for ov in lv.get("contentImage", {}).get("thumbnailViewModel", {}).get("overlays", []):
+        for key in ("thumbnailBottomOverlayViewModel", "thumbnailOverlayBadgeViewModel"):
+            for b in ov.get(key, {}).get("badges", []) or ov.get(key, {}).get("thumbnailBadges", []):
+                t = b.get("thumbnailBadgeViewModel", {}).get("text", "")
+                if ":" in t:
+                    dur = parse_duration(t)
+    if not vid or not title:
+        return None
+    return track_from_video(vid, title, channel, dur)
+
+
+def collect_videos(node, out=None, seen=None):
+    """Every video card anywhere in an InnerTube response, in order."""
+    if out is None:
+        out, seen = [], set()
+    if isinstance(node, dict):
+        t = None
+        if "videoRenderer" in node:
+            v = node["videoRenderer"]
+            if v.get("videoId"):
+                t = track_from_video(v["videoId"], _text(v.get("title")), _text(v.get("ownerText") or v.get("longBylineText")),
+                                     parse_duration(_text(v.get("lengthText"))))
+        elif "playlistVideoRenderer" in node:
+            v = node["playlistVideoRenderer"]
+            if v.get("videoId"):
+                t = track_from_video(v["videoId"], _text(v.get("title")), _text(v.get("shortBylineText")),
+                                     parse_duration(_text(v.get("lengthText"))))
+        elif "lockupViewModel" in node:
+            t = _lockup(node["lockupViewModel"])
+        if t and t["videoId"] not in seen:
+            seen.add(t["videoId"])
+            out.append(t)
+        for v in node.values():
+            collect_videos(v, out, seen)
+    elif isinstance(node, list):
+        for v in node:
+            collect_videos(v, out, seen)
+    return out
+
+
+def history():
+    return collect_videos(_post("browse", {"browseId": "FEhistory"}))
+
+
+def liked():
+    return collect_videos(_post("browse", {"browseId": "VLLL"}))
+
+
 def _walk_items(contents):
     for sec in contents:
         items = sec.get("itemSectionRenderer", {}).get("contents", [])

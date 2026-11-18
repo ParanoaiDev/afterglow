@@ -10,8 +10,10 @@ Item {
     property bool searchOpen: false
     property bool settingsOpen: false
     property bool serviceOpen: false
-    readonly property bool anyPopup: searchOpen || settingsOpen || serviceOpen
-    function closePopups() { searchOpen = false; settingsOpen = false; serviceOpen = false; keys.forceActiveFocus() }
+    property bool tasteOpen: false
+    readonly property bool anyPopup: searchOpen || settingsOpen || serviceOpen || tasteOpen
+    function closePopups() { searchOpen = false; settingsOpen = false; serviceOpen = false; tasteOpen = false; keys.forceActiveFocus() }
+    function openTaste() { closePopups(); taste.reload(); tasteOpen = true }
     function openSearch() { serviceOpen = false; settingsOpen = false; searchOpen = true; search.focusField() }
 
     Background { id: bg; anchors.fill: parent }
@@ -40,9 +42,10 @@ Item {
         visible: scene.cfg.showQueue
         u: scene.u
         accent: scene.accent
-        x: 56 * scene.u
-        y: parent.height * 0.2
-        height: parent.height * 0.56
+        backdrop: bg
+        x: 48 * scene.u
+        y: parent.height * 0.15
+        height: bar.y - y - 40 * scene.u
     }
 
     readonly property bool showWelcome: B.accountChecked && !B.account && !B.track
@@ -53,7 +56,7 @@ Item {
         u: scene.u
         accent: scene.accent
         anchors.horizontalCenter: parent.horizontalCenter
-        y: parent.height * 0.42
+        y: scene.cfg.showClock ? clock.y + clock.height + 26 * scene.u : parent.height * 0.3
     }
 
     // first run without a YouTube sign-in: explain what to do
@@ -96,30 +99,14 @@ Item {
             }
         }
     }
-    Rectangle {  // "Other lyrics" chip under the card
-        visible: scene.cfg.showCard && scene.cfg.showLyrics && B.lyrics.versions > 1
-        anchors { horizontalCenter: card.horizontalCenter; top: card.bottom; topMargin: 14 * scene.u }
-        width: olRow.width + 26 * scene.u; height: 32 * scene.u; radius: height / 2
-        color: Qt.rgba(0, 0, 0, olMa.containsMouse ? 0.55 : 0.4)
-        border.color: Qt.rgba(1, 1, 1, 0.18)
-        Row {
-            id: olRow
-            anchors.centerIn: parent
-            spacing: 6 * scene.u
-            Icon { name: "search"; width: 14 * scene.u; height: width; anchors.verticalCenter: parent.verticalCenter }
-            Text { text: B.strings.otherLyrics; color: "white"; font.pixelSize: 13 * scene.u; font.weight: Font.DemiBold }
-        }
-        MouseArea { id: olMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: B.otherLyrics() }
-    }
-
     LyricsView {
         visible: scene.cfg.showLyrics
         u: scene.u
         accent: scene.accent
         x: scene.cfg.showCard ? card.x + card.width + 60 * scene.u : parent.width * 0.3
-        y: card.y + 20 * scene.u
-        width: Math.min(parent.width - x - 140 * scene.u, 720 * scene.u)
-        height: card.height - 40 * scene.u
+        y: card.y + 40 * scene.u
+        width: Math.min(parent.width - x - 120 * scene.u, 700 * scene.u)
+        height: 420 * scene.u
     }
 
     PlayerBar {
@@ -180,6 +167,28 @@ Item {
         onCloseRequested: scene.closePopups()
     }
 
+    Rectangle {  // dim behind the taste picker
+        anchors.fill: parent
+        color: "black"
+        opacity: scene.tasteOpen ? 0.45 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 180 } }
+        MouseArea { anchors.fill: parent; onClicked: scene.closePopups() }
+    }
+    TastePanel {
+        id: taste
+        u: scene.u
+        accent: scene.accent
+        backdrop: bg
+        anchors.centerIn: parent
+        opacity: scene.tasteOpen ? 1 : 0
+        scale: scene.tasteOpen ? 1 : 0.96
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 180 } }
+        Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        onCloseRequested: scene.closePopups()
+    }
+
     Toast {
         id: toast
         u: scene.u
@@ -192,6 +201,7 @@ Item {
         target: B
         function onToastRequested(text) { toast.show(text) }
         function onOpenSearchRequested() { scene.openSearch() }
+        function onTasteRequested() { scene.openTaste() }
     }
 
     // keyboard: space play/pause, Ctrl+F or / search, arrows seek/volume, Esc closes

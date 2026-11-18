@@ -74,6 +74,8 @@ def main():
         probe.flush()
         probe.waitForBytesWritten(500)
         return 0
+    if cmd in ("quit", "toggle", "next", "prev"):
+        return 0  # nothing running: these commands must never start Afterglow
     QLocalServer.removeServer(SOCKET_NAME)
     server = QLocalServer()
     server.listen(SOCKET_NAME)
